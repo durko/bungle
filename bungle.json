@@ -1,0 +1,44 @@
+{
+    "bungle": {
+        "logger": {
+            "console": "debug"
+        },
+        "reset": true
+    },
+    "profiles": {
+        "default": {
+            "description": "Build package.",
+            "config": {
+            }
+        }
+    },
+    "pipes": {
+        "reader": {
+            "description": "Read files from disk.",
+            "type": "file-reader",
+            "pattern": "src/**/*"
+        },
+
+        "coffee2js": {
+            "description": "Compile CoffeeScript files to JavaScript.",
+            "type": "coffee",
+            "passthrough": true,
+            "inputs": ["reader"]
+        },
+
+        "move": {
+            "description": "Move files to destination.",
+            "type": "move",
+            "pattern": "**/!(*.coffee)",
+            "dir": "../lib",
+            "inputs": ["coffee2js"]
+        },
+
+        "writer": {
+            "description": "Write build results to disk.",
+            "type": "file-writer",
+            "debug": true,
+            "inputs": ["move"]
+        }
+    }
+}
