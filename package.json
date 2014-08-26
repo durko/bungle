@@ -1,6 +1,6 @@
 {
   "name": "bungle",
-  "version": "0.0.99",
+  "version": "0.1.0",
   "description": "Javascript build pipeline developement framework.",
   "homepage": "https://github.com/durko/bungle",
   "author": "Marko Durkovic <marko@miding.de>",
