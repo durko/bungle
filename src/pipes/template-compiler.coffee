@@ -20,4 +20,4 @@ module.exports = class ExtPipe extends Pipe.BasePipe
         source = file.content.toString()
         template = handlebars.compile source
         content = new Buffer template @config.context
-        super @changeHelper file, content
+        super @modifyFile file, "content", content

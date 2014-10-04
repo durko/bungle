@@ -25,4 +25,4 @@ module.exports = class ExtPipe extends BasePipe
 
     change: (file) ->
         css = @ap.process(file.content).css
-        super @changeHelper file, css
+        super @modifyFile file, "content", css

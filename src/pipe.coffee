@@ -41,31 +41,17 @@ class BasePipe
 
     #### Helpers for modifications
 
-    # Rename a file
-    renameHelper: (file) ->
-        if @rename
-            nfile = {}
-            for k, v of file
-                nfile[k] = v
-
-            if nfile.originalName is undefined
-                nfile.originalName = file.name
-
-            nfile.name = @rename file.name
-            nfile
-        else
-            file
-
-    # Change the content of a file
-    changeHelper: (file, content, sourceMap) ->
+    # Clone file and modify property
+    modifyFile: (file, key, value) ->
         nfile = {}
         for k, v of file
             nfile[k] = v
 
-        if nfile.originalContent is undefined
-            nfile.originalContent = file.content
+        __key = "__#{key}"
+        if nfile[__key] is undefined
+            nfile[__key] = file[key]
 
-        nfile.content = content
+        nfile[key] = value
         nfile
 
 
@@ -76,10 +62,9 @@ class BasePipe
     fileAdd: (name) ->
         return RSVP.Promise.resolve() if @state.localFiles[name]
 
-        file =
+        BasePipe::add.call @,
             name:name
             add:false
-        BasePipe::add.call @, file
         .then (res) =>
             @state.localFiles[name] =
                 name:name
@@ -147,7 +132,8 @@ class BasePipe
     _add_in: (file) ->
         if minimatch file.name, @config.pattern
             @log "debug", "A #{file.name}" if @config.debug
-            @add @renameHelper file
+            file = @modifyFile file, "name", @rename file.name if @rename
+            @add file
         else if @config.passthrough
             BasePipe::add.call @, file
         else
@@ -171,7 +157,8 @@ class BasePipe
     _change_in: (file) ->
         if minimatch file.name, @config.pattern
             @log "debug", "M #{file.name}" if @config.debug
-            @change @renameHelper file
+            file = @modifyFile file, "name", @rename file.name if @rename
+            @change file
         else if @config.passthrough
             BasePipe::change.call @, file
         else
@@ -201,7 +188,8 @@ class BasePipe
     _unlink_in: (file) ->
         if minimatch file.name, @config.pattern
             @log "debug", "D #{file.name}" if @config.debug
-            @unlink @renameHelper file
+            file = @modifyFile file, "name", @rename file.name if @rename
+            @unlink file
         else if @config.passthrough
             BasePipe::unlink.call @, file
         else

@@ -11,4 +11,4 @@ module.exports = class ExtPipe extends BasePipe
 
     change: (file) ->
         code = compiler.minify(file.content, fromString:true).code
-        super @changeHelper file, code
+        super @modifyFile file, "content", code

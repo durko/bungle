@@ -47,6 +47,6 @@ module.exports = class ExtPipe extends BasePipe
             .catch (err) =>
                 @log "error", "Error transpiling #{file.name}: #{err}"
             .then (content) =>
-                super @changeHelper file, content
+                super @modifyFile file, "content", content
         else
             super file

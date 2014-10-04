@@ -17,4 +17,4 @@ module.exports = class ExtPipe extends BasePipe
         catch e
             e.filename = file.name
             @log "error", "CompilerError: #{e.toString()}"
-        super @changeHelper file, js
+        super @modifyFile file, "content", js

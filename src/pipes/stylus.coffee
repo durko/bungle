@@ -20,4 +20,4 @@ module.exports = class ExtPipe extends BasePipe
         .catch (err) =>
             @log "error", "BROKEN #{file.name}\nError: #{err}"
         .then (css) =>
-            super @changeHelper file, css
+            super @modifyFile file, "content", css
