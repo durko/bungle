@@ -97,8 +97,8 @@ class BasePipe
 
             if digest isnt file.hash
                 file.hash = digest
-                file.content = content
-                BasePipe::change.call @, file
+                sendfile = @modifyFile file, "content", content
+                BasePipe::change.call @, sendfile
             else
                 null
         .then (res) =>
