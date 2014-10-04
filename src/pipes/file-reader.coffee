@@ -42,24 +42,6 @@ module.exports = class ExtPipe extends BasePipe
         .catch (err) ->
             console.log "ERROR reading fin file", name
 
-    fileAdd: (name) ->
-        if @matches name
-            super name
-        else
-            RSVP.Promise.resolve null
-
-    fileChange: (name) ->
-        if @matches name
-            super name
-        else
-            RSVP.Promise.resolve null
-
-    fileUnlink: (name) ->
-        if @matches name
-            super name
-        else
-            RSVP.Promise.resolve null
-
     start: ->
         super new RSVP.Promise (resolve, reject) =>
             @watcher = sane @config.basedir, [@config.pattern],
@@ -78,9 +60,10 @@ module.exports = class ExtPipe extends BasePipe
                     files.every test
 
                 func = (name) =>
-                    @fileAdd name
-                    .then =>
-                        @fileChange name
+                    if @matches name
+                        @fileAdd name
+                        .then =>
+                            @fileChange name
 
                 # emit files in order
                 files.reduce (p, i) ->
@@ -94,15 +77,17 @@ module.exports = class ExtPipe extends BasePipe
                 ###
 
             @watcher.on "add", (filepath, root) =>
-                RSVP.Promise.resolve null
-                .then => @fileAdd filepath
-                .then => @fileChange filepath
+                if @matches filepath
+                    @fileAdd filepath
+                    .then => @fileChange filepath
 
             @watcher.on "change", (filepath, root) =>
-                @fileChange filepath
+                if @matches filepath
+                    @fileChange filepath
 
             @watcher.on "delete", (filepath, root) =>
-                @fileUnlink filepath
+                if @matches filepath
+                    @fileUnlink filepath
 
     stop: ->
         @watcher.close() if @config.continuous
