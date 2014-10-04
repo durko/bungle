@@ -85,9 +85,9 @@ class BasePipe
                 name:name
                 added:res.add
             res
-        .catch (err) ->
-            console.log err
-            console.log err.stack
+        .catch (err) =>
+            @log "error", err
+            @log "error", err.stack
 
     # Message file change
     fileChange: (name, content) ->
@@ -122,9 +122,9 @@ class BasePipe
                 file.reread = false
                 @fileChange name
             res
-        .catch (err) ->
-            console.log err
-            console.log err.stack
+        .catch (err) =>
+            @log "error", err
+            @log "error", err.stack
 
     # Remove a file from the pipeline
     fileUnlink: (name) ->
@@ -135,9 +135,9 @@ class BasePipe
         .then (res) =>
             delete @state.localFiles[name]
             res
-        .catch (err) ->
-            console.log err
-            console.log err.stack
+        .catch (err) =>
+            @log "error", err
+            @log "error", err.stack
 
 
 
