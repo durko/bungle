@@ -13,7 +13,7 @@ module.exports = class ExtPipe extends BasePipe
 
     change: (file) ->
         try
-            js = compiler.compile file.content, {bare:true}
+            js = new Buffer compiler.compile file.content.toString(), bare:true
         catch e
             e.filename = file.name
             @log "error", "CompilerError: #{e.toString()}"

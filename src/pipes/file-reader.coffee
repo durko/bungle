@@ -37,10 +37,8 @@ module.exports = class ExtPipe extends BasePipe
 
     getFileContent: (name) ->
         readFile path.join @config.basedir, name
-        .then (content) ->
-            content.toString "utf8"
-        .catch (err) ->
-            console.log "ERROR reading fin file", name
+        .catch (err) =>
+            @log "error", "Could not read", name
 
     start: ->
         super new RSVP.Promise (resolve, reject) =>

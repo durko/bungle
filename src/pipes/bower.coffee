@@ -61,12 +61,10 @@ module.exports = class ExtPipe extends BasePipe
     getFileContent: (name) ->
         readFile name
         .then (content) =>
-            content = content.toString "utf8"
-
             if name is "#{@state.directory}/requirejs/require.js"
                 config = JSON.stringify {"packages":@bower.pkgConfig()}, 0, 4
-                content = """#{content}\nrequirejs.config(#{config});"""
-
+                content =
+                    new Buffer """#{content}\nrequirejs.config(#{config});"""
             content
         .catch (err) =>
             @log "error", "Cannot read file #{name} #{err}"

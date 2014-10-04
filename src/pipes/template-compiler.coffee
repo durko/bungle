@@ -17,6 +17,7 @@ module.exports = class ExtPipe extends Pipe.BasePipe
     rename: (name) -> name.replace /\.hbs$/, ".html"
 
     change: (file) ->
-        template = handlebars.compile file.content
-        content = template @config.context
+        source = file.content.toString()
+        template = handlebars.compile source
+        content = new Buffer template @config.context
         super @changeHelper file, content

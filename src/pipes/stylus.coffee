@@ -15,9 +15,9 @@ module.exports = class ExtPipe extends BasePipe
 
     change: (file) ->
         func = RSVP.denodeify (cb) ->
-            stylus(file.content).use(nib()).render cb
+            new Buffer stylus(file.content.toString()).use(nib()).render cb
         func()
-        .catch (err) ->
+        .catch (err) =>
             @log "error", "BROKEN #{file.name}\nError: #{err}"
         .then (css) =>
             super @changeHelper file, css

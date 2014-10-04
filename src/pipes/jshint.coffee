@@ -45,7 +45,7 @@ module.exports = class ExtPipe extends BasePipe
             hints = @findHints file.name
 
             # perform linting
-            lintok = jslint file.content, hints
+            lintok = jslint file.content.toString(), hints
             if not lintok
                 e = jslint.errors[0]
                 @state.broken.push file.name if file.name not in @state.broken
