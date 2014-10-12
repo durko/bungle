@@ -1,5 +1,4 @@
 commander = require "commander"
-RSVP = require "rsvp"
 {Logger} = require "./logger"
 {Config} = require "./config"
 {Pipeline} = require "./pipeline"
@@ -54,27 +53,6 @@ if commander.checkconfig
 
 # create singleton logger instance
 log = new Logger cfg
-
-
-
-# install CTRL-C handler
-setupSIGINT = ->
-    shuttingDown = false
-    process.on "SIGINT", ->
-        if shuttingDown
-            log.log "info", "process", "Force exiting ..."
-            log.log "debug", "process", process._getActiveHandles()
-            process.exit()
-        else
-            shuttingDown = true
-            log.log "info", "process", "Shutting down gracefully ..."
-
-            RSVP.all Pipeline.instances.map (pipeline) -> pipeline.cleanup()
-            .then ->
-                log.log "info", "process", "Bye"
-                process.exit()
-
-setupSIGINT()
 
 
 

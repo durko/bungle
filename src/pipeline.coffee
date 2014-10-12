@@ -30,12 +30,35 @@ parseExJSON = (json) ->
 gzip = RSVP.denodeify zlib.gzip
 writeFile = RSVP.denodeify fs.writeFile
 
+# CTRL-C handler
+setupSIGINT = (log) ->
+    shuttingDown = false
+    process.on "SIGINT", ->
+        if shuttingDown
+            log.log "info", "process", "Force exiting ..."
+            log.log "debug", "process", process._getActiveHandles()
+            process.exit()
+        else
+            shuttingDown = true
+            log.log "info", "process", "Shutting down gracefully ..."
+
+            RSVP.all Pipeline.instances.map (pipeline) -> pipeline.cleanup()
+            .then ->
+                log.log "info", "process", "Bye"
+                process.exit()
+
 module.exports.Pipeline = class Pipeline extends EventEmitter
+    @sigintInstalled: false
     @instances: []
     pipes: {}
 
     constructor: (@logger, @cfg) ->
         @config = @cfg.getPipelineConfig()
+
+        if not @constructor.sigintInstalled
+            setupSIGINT @logger
+            @constructor.sigintInstalled = true
+
         @loadState()
         .then (state) =>
             @state = state
