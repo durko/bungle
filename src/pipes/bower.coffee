@@ -58,13 +58,20 @@ module.exports = class ExtPipe extends BasePipe
             p.then -> func i
         , RSVP.Promise.resolve()
 
+    nameReq: "requirejs/require.js"
+    nameEML: "es6-module-loader/dist/es6-module-loader-sans-promises.js"
+
     getFileContent: (name) ->
         readFile name
         .then (content) =>
-            if name is "#{@state.directory}/requirejs/require.js"
+            if name is "#{@state.directory}/#{@nameReq}"
                 config = JSON.stringify {"packages":@bower.pkgConfig()}, 0, 4
                 content =
                     new Buffer """#{content}\nrequirejs.config(#{config});"""
+            else if name is "#{@state.directory}/#{@nameEML}"
+                mods = for p in @bower.pkgConfig()
+                    "System.paths['#{p.name}']='#{p.location}/#{p.main}.js';"
+                content = new Buffer content + "\n" + mods.join "\n"
             content
         .catch (err) =>
             @log "error", "Cannot read file #{name} #{err}"
