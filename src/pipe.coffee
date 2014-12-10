@@ -62,6 +62,7 @@ class BasePipe
     fileAdd: (name) ->
         return RSVP.Promise.resolve() if @state.localFiles[name]
 
+        @log "debug", "LA #{name}" if @config.debug
         BasePipe::add.call @,
             name:name
             add:false
@@ -79,6 +80,7 @@ class BasePipe
         file = @state.localFiles[name]
         return if not file?.added
 
+        @log "debug", "LC #{name}" if @config.debug
         if file.changing
             @state.localFiles[name].reread = true
             return
@@ -116,6 +118,7 @@ class BasePipe
         file = @state.localFiles[name]
         return if not file?.added
 
+        @log "debug", "LD #{name}" if @config.debug
         BasePipe::unlink.call @, file
         .then (res) =>
             delete @state.localFiles[name]
