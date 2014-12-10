@@ -82,8 +82,10 @@ module.exports = class ExtPipe extends BasePipe
             new RSVP.Promise (resolve) =>
                 @afterInit.push => resolve @broadcast req
         else if req.type is "getVendorVanillaPackages"
-            RSVP.all req.packages.map (name) =>
-                RSVP.all @bower.jsForPkg(name).map (file) ->
+            res = {}
+            for pkg, names of req.packages
+                res[pkg] = RSVP.all @bower.jsForPkg(pkg, names).map (file) ->
                     readFile file
+            RSVP.hash res
         else if req.type is "getBowerConfig"
             @bower.pkgConfig()
