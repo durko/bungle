@@ -27,44 +27,36 @@ module.exports = class ExtPipe extends CompileInputDataPipe
         else
             p = @pipeline.broadcast
                 type: "getVendorVanillaPackages"
-                packages: ["handlebars","ember","emblem"]
+                packages: {
+                    "handlebars": []
+                    "ember": ["ember-template-compiler.js"]
+                    "emblem": []
+                }
             .then (res) =>
                 @log "verbose", "Got vanilla vendor packages"
 
                 res = (r for r in res when r)[0]
 
-                @state.vendor.handlebars = res[0][0].toString "utf8"
-                @state.vendor.ember = res[1][0].toString "utf8"
-                @state.vendor.emblem = res[2][0].toString "utf8"
+                @state.vendor.handlebars = res.handlebars[0].toString "utf8"
+                @state.vendor.ember = res.ember[0].toString "utf8"
+                @state.vendor.emblem = res.emblem[0].toString "utf8"
 
         p.then =>
-            jQuery = -> jQuery
-            jQuery.jquery = "2.1.1"
-            jQuery.event = { fixHooks: {} }
-
-            element =
-                appendChild: ->
-                childNodes: [
-                    { nodeValue: "Test:" },
-                    null,
-                    { nodeValue: 'Value' }
-                ]
-                firstChild: -> element
-                innerHTML: -> element
-                setAttribute: ->
-
-            @context = vm.createContext
-                document:
-                    createElement: -> element
-                jQuery: jQuery
+            @context = vm.createContext {}
             @context.window = @context
 
             try
                 v = @state.vendor
+                @log "verbose", "loading handlebars"
                 vm.runInContext v.handlebars, @context, "handlebars.js"
+                @log "verbose", "loading emblem"
                 vm.runInContext v.emblem, @context, "emblem.js"
-                vm.runInContext v.ember, @context, "ember.js"
-            catch
+                @log "verbose", "loading ember"
+                ember_src = v.ember.replace /exports/g, "this"
+                vm.runInContext ember_src, @context, "ember.js"
+            catch e
+                @log "error", "Could not initialize compile environemnt: #{e}"
+                @log "error", e.stack
                 @context = null
             super()
 
@@ -84,7 +76,25 @@ module.exports = class ExtPipe extends CompileInputDataPipe
             export default T;
         """ ]
 
-        compile = "js = Emblem.precompile(Em.Handlebars, template)"
+        compile = "
+            var options = {
+                knownHelpers: {
+                    action: true,
+                    unbound: true,
+                    'bind-attr': true,
+                    template: true,
+                    view: true,
+                    _triageMustache: true
+                },
+                data: true,
+                stringParams: true
+            };
+            Emblem.handlebarsVariant = EmberHandlebars;
+            ast = Emblem.parse(template);
+            environment = new EmberHandlebars.Compiler().compile(ast, options);
+            compiler = new EmberHandlebars.JavaScriptCompiler();
+            js = compiler.compile(environment, options, undefined, false);
+        "
 
         for pathname, src of @state.files
             pathname = @unprefix pathname
@@ -107,9 +117,11 @@ module.exports = class ExtPipe extends CompileInputDataPipe
             try
                 @context.template = Buffer(src).toString()
                 vm.runInContext compile, @context
-                results.push "T[\"#{key}\"] = t(#{@context.js.toString()});\n"
+
+                results.push "T[\"#{key}\"] = t(#{@context.js});\n"
             catch e
                 @log "error", "ParserError: #{e.toString()}"
+                @log "error", e.stack
 
         RSVP.Promise.resolve results.join ""
 
