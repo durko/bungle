@@ -48,14 +48,14 @@ module.exports = class ExtPipe extends BasePipe
             @watcher.on "ready", =>
                 files = []
                 for dir, filenames of @watcher.dirRegistery
-                    files = files.concat Object.keys(filenames).map (n) ->
-                        path.join dir, n
+                    files = files.concat Object.keys(filenames).map (n) =>
+                        fullpath = path.join dir, n
+                        path.relative @config.basedir, fullpath
 
                 # filter out directories
-                files = files.filter (f) ->
-                    r = new RegExp "^#{f}/"
-                    test = (name) -> not r.test name
-                    files.every test
+                base = path.resolve @config.basedir
+                files = files.filter (f) =>
+                    not @watcher.watched[path.join base, f]
 
                 func = (name) =>
                     if @matches name
@@ -74,16 +74,17 @@ module.exports = class ExtPipe extends BasePipe
                 RSVP.all files.map (f) -> func f
                 ###
 
-            @watcher.on "add", (filepath, root) =>
+            @watcher.on "add", (filepath, root, stat) =>
+                return if stat.isDirectory()
                 if @matches filepath
                     @fileAdd filepath
                     .then => @fileChange filepath
 
-            @watcher.on "change", (filepath, root) =>
+            @watcher.on "change", (filepath, root, stat) =>
                 if @matches filepath
                     @fileChange filepath
 
-            @watcher.on "delete", (filepath, root) =>
+            @watcher.on "delete", (filepath, root, stat) =>
                 if @matches filepath
                     @fileUnlink filepath
 
