@@ -42,8 +42,8 @@ module.exports = class ExtPipe extends BasePipe
 
     start: ->
         super new RSVP.Promise (resolve, reject) =>
-            @watcher = sane @config.basedir, [@config.pattern],
-                persistent: @config.continuous
+            @watcher = sane @config.basedir,
+                glob: [@config.pattern],
 
             @watcher.on "ready", =>
                 files = []
@@ -73,6 +73,8 @@ module.exports = class ExtPipe extends BasePipe
                 ###
                 RSVP.all files.map (f) -> func f
                 ###
+
+                @watcher.close() if not @config.continuous
 
             @watcher.on "add", (filepath, root, stat) =>
                 return if stat.isDirectory()
