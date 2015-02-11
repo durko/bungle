@@ -1,7 +1,7 @@
 {
   "name": "bungle",
   "version": "0.2.0",
-  "description": "Javascript build pipeline developement framework.",
+  "description": "Javascript build pipeline development framework.",
   "homepage": "https://github.com/durko/bungle",
   "author": "Marko Durkovic <marko@miding.de>",
   "repository": {
