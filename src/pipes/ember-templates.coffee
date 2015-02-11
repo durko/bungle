@@ -1,129 +1,50 @@
-vm = require "vm"
-
 RSVP = require "rsvp"
 
-{CompileInputDataPipe} = require "../pipe"
+{BasePipe} = require "../pipe"
 
-module.exports = class ExtPipe extends CompileInputDataPipe
+module.exports = class ExtPipe extends BasePipe
     @schema: ->
-        description: """
-            Precompile Handlebars and Emblem templates for an Ember app.
-        """
-        properties:
-            filename:
-                description: "Filename of the compiled module"
-                type: "string"
-        required: ["filename"]
+        description: "Compile HTMLBars to Javascript"
 
     @configDefaults:
-        pattern: "**/*.emblem"
+        pattern: "**/*.hbs"
 
     @stateDefaults:
-        vendor: {}
+        compiler: null
 
     init: ->
-        if @state.vendor.emblem
+        if @state.compiler
             p = RSVP.Promise.resolve()
         else
             p = @pipeline.broadcast
                 type: "getVendorVanillaPackages"
                 packages: {
-                    "handlebars": []
                     "ember": ["ember-template-compiler.js"]
-                    "emblem": []
                 }
             .then (res) =>
-                @log "verbose", "Got vanilla vendor packages"
-
+                @log "verbose", "Got ember template compiler"
                 res = (r for r in res when r)[0]
-
-                @state.vendor.handlebars = res.handlebars[0].toString "utf8"
-                @state.vendor.ember = res.ember[0].toString "utf8"
-                @state.vendor.emblem = res.emblem[0].toString "utf8"
+                @state.compiler = res.ember[0].toString "utf8"
 
         p.then =>
-            @context = vm.createContext {}
-            @context.window = @context
+            compiler = new module.constructor()
+            compiler.paths = module.paths
+            compiler._compile @state.compiler, "ember-template-compiler.js"
 
-            try
-                v = @state.vendor
-                @log "verbose", "loading handlebars"
-                vm.runInContext v.handlebars, @context, "handlebars.js"
-                @log "verbose", "loading emblem"
-                vm.runInContext v.emblem, @context, "emblem.js"
-                @log "verbose", "loading ember"
-                ember_src = v.ember.replace /exports/g, "this"
-                vm.runInContext ember_src, @context, "ember.js"
-            catch e
-                @log "error", "Could not initialize compile environemnt: #{e}"
-                @log "error", e.stack
-                @context = null
+            @compiler = compiler.exports
             super()
 
-    unprefix: (f) ->
-        f
-        .replace(/\.emblem$/, "")
-        .replace(/[\./]*/, "")
+    rename: (name) -> name.replace /hbs$/, "js"
 
-    valid: /^(templates|pods)$/
+    change: (file) ->
+        try
+            compiled = @compiler.precompile file.content.toString(), false
+            js = "
+                import Em from \"vendor/ember\";
+                export default Em.HTMLBars.template(#{compiled});
+            "
+        catch e
+            e.filename = file.name
+            @log "error", "CompilerError: #{e.toString()}"
+        super @modifyFile file, "content", js
 
-    getFileContent: ->
-        @log "debug", "#C# #{@config.filename}" if @config.debug
-
-        results = [ """
-            import Em from "vendor/ember";
-            var T=Em.TEMPLATES, t=Em.Handlebars.template;
-            export default T;
-        """ ]
-
-        compile = "
-            var options = {
-                knownHelpers: {
-                    action: true,
-                    unbound: true,
-                    'bind-attr': true,
-                    template: true,
-                    view: true,
-                    _triageMustache: true
-                },
-                data: true,
-                stringParams: true
-            };
-            Emblem.handlebarsVariant = EmberHandlebars;
-            ast = Emblem.parse(template);
-            environment = new EmberHandlebars.Compiler().compile(ast, options);
-            compiler = new EmberHandlebars.JavaScriptCompiler();
-            js = compiler.compile(environment, options, undefined, false);
-        "
-
-        for pathname, src of @state.files
-            pathname = @unprefix pathname
-            parts = pathname.split "/"
-            continue if not @valid.test parts[0]
-
-            if parts[0] is "pods"
-                type = parts.pop()
-                if type is "component"
-                    parts[0] = "components"
-                    key = parts.join "/"
-                else if type is "template"
-                    parts.shift()
-                    key = parts.join "/"
-                else
-                    continue
-            else
-                key = parts[1..].join "/"
-
-            try
-                @context.template = Buffer(src).toString()
-                vm.runInContext compile, @context
-
-                results.push "T[\"#{key}\"] = t(#{@context.js});\n"
-            catch e
-                @log "error", "ParserError: #{e.toString()}"
-                @log "error", e.stack
-
-        RSVP.Promise.resolve results.join ""
-
-    compile: ->
-        @fileChange @config.filename
