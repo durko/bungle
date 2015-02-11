@@ -108,8 +108,6 @@ module.exports = class ExtPipe extends CompileInputDataPipe
         ast
 
     compile: ->
-        if @config.debug
-            @log "debug", "#C#"
         try
             ast = @loadRecursively @config.main
             olddir = path.dirname @config.main

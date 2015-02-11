@@ -51,7 +51,6 @@ module.exports = class ExtPipe extends CompileInputDataPipe
         super file
 
     compile: ->
-        @log "debug", "#C#" if @config.debug
         try
             if @config.sourceMap
                 code = recast.print(@bundler.bundle()).code
