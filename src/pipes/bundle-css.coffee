@@ -46,7 +46,7 @@ module.exports = class ExtPipe extends CompileInputDataPipe
 
     loadRecursively: (pathname) ->
         dir = path.dirname pathname
-        ast = css.parse @state.files[pathname]||""
+        ast = css.parse @state.files[pathname].toString()||""
         rules = ast.stylesheet.rules
         skiplist = []
         while 1
