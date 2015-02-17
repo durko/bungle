@@ -8,6 +8,7 @@ sane = require "sane"
 {BasePipe} = require "../pipe"
 
 readFile = RSVP.denodeify fs.readFile
+realpath = RSVP.denodeify fs.realpath
 
 module.exports = class ExtPipe extends BasePipe
     @schema: ->
@@ -40,7 +41,15 @@ module.exports = class ExtPipe extends BasePipe
         .catch (err) =>
             @log "error", "Could not read", name
 
+    init: ->
+        realpath @config.basedir
+        .then (basedir) =>
+            @config.basedir = basedir
+        .catch =>
+            @log "error", "Cannot read from #{@config.basedir}"
+            @config.basedir = null
     start: ->
+        return if not @config.basedir
         super new RSVP.Promise (resolve, reject) =>
             @watcher = sane @config.basedir,
                 glob: [@config.pattern],
@@ -91,4 +100,5 @@ module.exports = class ExtPipe extends BasePipe
                     @fileUnlink filepath
 
     stop: ->
+        return if not @config.basedir
         @watcher.close() if @config.continuous
