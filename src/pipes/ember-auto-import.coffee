@@ -39,7 +39,7 @@ module.exports = class ExtPipe extends CompileInputListPipe
     getFileContent: ->
         @log "debug", "#C# #{@config.filename}" if @config.debug
 
-        results = ["import Em from \"vendor/ember\""]
+        results = ["import Em from \"ember\""]
         objects = []
 
         for pathname in @state.files.sort()

@@ -40,7 +40,7 @@ module.exports = class ExtPipe extends BasePipe
         try
             compiled = @compiler.precompile file.content.toString(), false
             js = "
-                import Em from \"vendor/ember\";
+                import Em from \"ember\";
                 export default Em.HTMLBars.template(#{compiled});
             "
         catch e
