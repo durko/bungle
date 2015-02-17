@@ -15,9 +15,10 @@ formatedLevel =
     warn: chalk.red "warn"
     error: chalk.bgRed.white "error"
 
-module.exports.Logger = class Logger
-    constructor: (cfg) ->
-        config = cfg.logger()
+
+
+class Logger
+    constructor: (config) ->
         @level =
             console: levels[config.console || "debug"]
             notify: levels[config.notify || "info"]
@@ -30,3 +31,8 @@ module.exports.Logger = class Logger
                 message
         if @level.notify <= levels[level]
             growl message, { title: "Bungle #{level} #{prefix}" }
+
+
+
+module.exports.Logger = Logger
+

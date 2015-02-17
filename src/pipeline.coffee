@@ -1,13 +1,16 @@
 {EventEmitter} = require "events"
 fs = require "fs"
+path = require "path"
 zlib = require "zlib"
 
 RSVP = require "rsvp"
 
 RSVP.on "error", (error) -> console.assert false, error
 
-RegExp::toJSON = RegExp::toJSON || ->
-    type: "__regexp"
+
+
+RegExp::toJSON = ->
+    type: "RegExp"
     source: @source
     flags: [
         if @global then "g" else ""
@@ -15,11 +18,17 @@ RegExp::toJSON = RegExp::toJSON || ->
         if @ignoreCase then "i" else ""
     ].join ""
 
+Buffer::toJSON = ->
+    type: "Buffer"
+    data: @toString "hex"
+
 parseExJSON = (json) ->
     convert = (data) ->
         for k, v of data
-            if v and v.type is "__regexp"
+            if v and v.type is "RegExp"
                 data[k] = new RegExp v.source, v.flags
+            else if v and v.type is "Buffer"
+                data[k] = new Buffer v.data, "hex"
             else if typeof v is "object"
                 convert v
         data
@@ -27,8 +36,15 @@ parseExJSON = (json) ->
     data = JSON.parse json
     convert data
 
+gunzip = RSVP.denodeify zlib.gunzip
 gzip = RSVP.denodeify zlib.gzip
+readFile = RSVP.denodeify fs.readFile
+mkdir = RSVP.denodeify fs.mkdir
+stat = RSVP.denodeify fs.stat
+unlink = RSVP.denodeify fs.unlink
 writeFile = RSVP.denodeify fs.writeFile
+
+
 
 # CTRL-C handler
 setupSIGINT = (log) ->
@@ -47,14 +63,14 @@ setupSIGINT = (log) ->
                 log.log "info", "process", "Bye"
                 process.exit()
 
-module.exports.Pipeline = class Pipeline extends EventEmitter
+
+
+class Pipeline extends EventEmitter
     @sigintInstalled: false
     @instances: []
     pipes: {}
 
     constructor: (@logger, @cfg) ->
-        @config = @cfg.getPipelineConfig()
-
         if not @constructor.sigintInstalled
             setupSIGINT @logger
             @constructor.sigintInstalled = true
@@ -75,36 +91,27 @@ module.exports.Pipeline = class Pipeline extends EventEmitter
         .catch (err) =>
             @log "error", "Pipeline constructor error #{err} #{err.stack}"
 
-    readFile: RSVP.denodeify fs.readFile
-    gunzip: RSVP.denodeify zlib.gunzip
-    unlink: RSVP.denodeify fs.unlink
-
     # load cached state
     loadState: ->
-        if @config.bungle.reset
-            @unlink ".bungle.state"
-            .catch ->
-                null
-            .then =>
-                hash:@config.hash
+        filename = path.join ".bungle", "state.#{@cfg.config.hash}"
+
+        if @cfg.config.bungle.reset
+            @log "verbose", "Discarding previous state"
+            unlink filename
+            .catch -> null
+            .then => hash: @cfg.config.hash
         else
-            @readFile ".bungle.state"
-            .then (compressed) =>
-                @gunzip compressed
-            .then (data) =>
-                state = parseExJSON data
-                if state.hash is @config.hash
-                    state
-                else
-                    hash:@config.hash
+            readFile filename
+            .then (compressed) -> gunzip compressed
+            .then (data) -> parseExJSON data
             .catch (err) =>
-                @log "info", "Previous state could not be loaded"
-                hash:@config.hash
+                @log "verbose", "Starting with a fresh state"
+                hash: @cfg.config.hash
 
     createPipes: ->
-        for id, pipeconfig of @config.pipes
+        for id, pipeconfig of @cfg.config.pipes
             # get state and prototype
-            pipestate = @state[id] || {}
+            pipestate = @state[id] || (@state[id] = {})
             PipeClass = @cfg.pipes[pipeconfig.type]
 
             @pipes[id] = new PipeClass pipeconfig, pipestate, @
@@ -113,7 +120,7 @@ module.exports.Pipeline = class Pipeline extends EventEmitter
         RSVP.all (pipe.init() for _, pipe of @pipes)
         .then =>
             # connect inputs of all pipes
-            for id, pipeconfig of @config.pipes
+            for id, pipeconfig of @cfg.config.pipes
                 for input in pipeconfig.inputs
                     @pipes[input].outputs.push @pipes[id]
 
@@ -128,15 +135,21 @@ module.exports.Pipeline = class Pipeline extends EventEmitter
             @orderedPipes = sorted.reverse()
 
     cleanup: ->
-        state = { hash: @config.hash }
-        state[id] = pipe.state for id, pipe of @pipes
-
         @log "info", "Saving state"
         RSVP.all (pipe.stop() for _, pipe of @pipes)
-        .then ->
-            gzip JSON.stringify(state)
-        .then (data) ->
-            writeFile ".bungle.state", data
+        .then =>
+            gzip JSON.stringify @state
+        .then (data) =>
+            filename = path.join ".bungle", "state.#{@cfg.config.hash}"
+            writeFile filename, data
+            .catch (err) =>
+                if err.errno is -2
+                    mkdir ".bungle"
+                    .then -> writeFile filename, data
+                    .catch (err) =>
+                        @log "error", "Could not dump state cache #{err}"
+                else
+                    @log "error", "Could not dump state cache #{err}"
         .then =>
             @log "info", "Pipeline shutdown complete"
 
@@ -146,3 +159,8 @@ module.exports.Pipeline = class Pipeline extends EventEmitter
 
     log: (level, args...) ->
         @logger.log level, "pipeline", args...
+
+
+
+module.exports.Pipeline = Pipeline
+
