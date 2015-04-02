@@ -12,35 +12,31 @@ RSVP = require "rsvp"
 
 {BasePipe} = require "../pipe"
 
+reloadCode = """
+    +function() {
+        io.connect(window.location.origin, { path: "/__reload" })
+        .on("reconnect", function() { location.reload(); })
+        .on("page", function() { location.reload(); })
+        .on("css", function() {
+            var links = document.getElementsByTagName("link"),
+                date = new Date().valueOf();
+            for (var i=0; i<links.length; i++) {
+                var tag = links[i];
+                if (/stylesheet/i.test(tag.rel) && tag.href) {
+                    var href = tag.href.replace(/(&|\\?)\\d+/, ""),
+                        query = (~href.indexOf("?")?"&":"?") + date;
+                    tag.href = href + query;
+                }
+            }
+        });
+    }();
+"""
+
+
 reload = (pattern) ->
     script = """
-        <script type="text/javascript" src="/socket.io/socket.io.js"></script>
-        <script type="text/javascript">
-        (function() {
-            var d = document,
-                h = d.getElementsByTagName("head")[0],
-                origin = window.location.href.split("/").slice(0, 3),
-                hostport = origin[2].split(":");
-
-            hostport[1] = parseInt(hostport[1], 10) + 1;
-            origin[2] = hostport.join(":");
-            io.connect(origin.join("/"))
-            .on("reconnect", function() { location.reload(); })
-            .on("page", function() { location.reload(); })
-            .on("css", function() {
-                var links = d.getElementsByTagName("link"),
-                    date = new Date().valueOf();
-                for (var i=0; i<links.length; i++) {
-                    var tag = links[i];
-                    if (/stylesheet/i.test(tag.rel) && tag.href) {
-                        var href = tag.href.replace(/(&|\\?)\\d+/, ""),
-                            query = (~href.indexOf("?")?"&":"?") + date;
-                        tag.href = href + query;
-                    }
-                }
-            });
-        })();
-        </script>
+        <script type="text/javascript" src="/__reload/socket.io.js"></script>
+        <script type="text/javascript">#{reloadCode}</script>
     """
 
     return (req, res, next) ->
@@ -248,14 +244,9 @@ module.exports = class ExtPipe extends BasePipe
                 key: fs.readFileSync @config.key
                 cert: fs.readFileSync @config.cert
             }, @app
-            @ioserver = https.createServer {
-                key: fs.readFileSync @config.key
-                cert: fs.readFileSync @config.cert
-            }
         else
             @server = http.createServer @app
-            @ioserver = http.createServer()
-        @io = new sio @ioserver, { "log level": 0 }
+        @io = new sio @server, { "log level": 0, "path": "/__reload" }
 
 
         @app.use require("body-parser").json({limit: '50mb'})
@@ -269,7 +260,6 @@ module.exports = class ExtPipe extends BasePipe
 
     start: ->
         @server.listen @config.port
-        @ioserver.listen @config.port + 1
         protocol = "http#{(if @config.key then "s" else "")}"
         address = "#{protocol}://localhost:#{@config.port}"
         @log "info", "Listening on #{address}"
@@ -277,7 +267,6 @@ module.exports = class ExtPipe extends BasePipe
 
     stop: ->
         @server.close()
-        @ioserver.close()
 
     add: (file) ->
         file.add = true
