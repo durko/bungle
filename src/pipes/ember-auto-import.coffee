@@ -42,6 +42,7 @@ module.exports = class ExtPipe extends CompileInputListPipe
 
         results = ["import Em from \"ember\""]
         objects = []
+        initializers = []
 
         for pathname in @state.files.sort()
             pathname = @sanitize pathname
@@ -68,7 +69,11 @@ module.exports = class ExtPipe extends CompileInputListPipe
             modname = "#{camelcasename}#{type}"
 
             results.push "import #{modname} from \"./#{pathname}\";"
-            objects.push "#{modname}"
+            if type is "Initializer"
+                initializers.push "Em.Application.initializer(#{modname});"
+            else
+                objects.push "#{modname}"
+        results.push initializers.join "\n"
         results.push "var App = {"
         results.push "
             Resolver: Em.DefaultResolver.extend({
