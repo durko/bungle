@@ -50,11 +50,21 @@ module.exports = class ExtPipe extends CompileInputListPipe
             continue if not @valid.test parts[0]
 
             if parts[0] is "pods"
-                type = parts.pop().replace /([a-z])(.*)/,
-                    ($0,$1,$2) -> $1.toUpperCase()+$2
+                len = parts.length
+                secondLast = parts[len-2]
+                if secondLast in @entities
+                    type = parts.splice(len-2, 1)[0].replace /([a-z])(.*)s/,
+                        ($0,$1,$2) -> $1.toUpperCase()+$2
+                else
+                    type = parts.pop().replace /([a-z])(.*)/,
+                        ($0,$1,$2) -> $1.toUpperCase()+$2
+                    .replace /(^|\-)([a-z])/g,
+                        ($1) -> $1.toUpperCase().replace("-", "")
                 parts[1] = parts[1].replace /^_/, ""
                 dashedname = parts[1..].join "-"
-                camelcasename = dashedname.replace /(^|\-)([a-z])/g,
+                #camelcasename = dashedname.replace /(^|\-)([a-z])/g,
+                #    ($1) -> $1.toUpperCase().replace("-", "")
+                camelcasename = dashedname.replace /(^|\-)(.)/g,
                     ($1) -> $1.toUpperCase().replace("-", "")
             else
                 type = parts[0].replace /([a-z])(.*)s/,
@@ -62,7 +72,9 @@ module.exports = class ExtPipe extends CompileInputListPipe
 
                 parts[1] = parts[1].replace /^_/, ""
                 dashedname = parts[1..].join "-"
-                camelcasename = dashedname.replace /(^|\-)([a-z])/g,
+                #camelcasename = dashedname.replace /(^|\-)([a-z])/g,
+                #    ($1) -> $1.toUpperCase().replace("-", "")
+                camelcasename = dashedname.replace /(^|\-)(.)/g,
                     ($1) -> $1.toUpperCase().replace("-", "")
 
             camelcasename = "" if camelcasename is "Main"
