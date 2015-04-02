@@ -32,6 +32,42 @@ reloadCode = """
     }();
 """
 
+csp = (config, hostnames, reload) ->
+    defaults =
+        defaultSrc: ["'none'"]
+        connectSrc: ["'self'"]
+        fontSrc: ["'self'"]
+        frameSrc: ["'self'"]
+        imgSrc: ["'self'"]
+        mediaSrc: ["'self'"]
+        objectSrc: ["'self'"]
+        scriptSrc: ["'self'"]
+        styleSrc: ["'self'"]
+
+    dasherize = (s) -> s.replace /([A-Z])/g, (_, m) -> "-#{m.toLowerCase()}"
+
+    headerValues = for key, value of defaults
+        config[key] = value if not config[key]
+
+        if reload
+            if key is "scriptSrc"
+                crypto = require "crypto"
+                hash = crypto.createHash "sha256"
+                hash.update reloadCode
+                config[key].push "'sha256-#{hash.digest "base64"}'"
+            else if key is "connectSrc"
+                if not ~hostnames.indexOf "localhost"
+                    hostnames = hostnames.concat ["localhost"]
+                config[key].push hostnames.map((h) -> "ws://#{h}:*").join " "
+        "#{dasherize key} #{config[key].join " "}"
+
+    headerValue = headerValues.join "; "
+
+    return (req, res, next) ->
+        return next() if not minimatch req.path.split("/").pop(), "*.html"
+
+        res.setHeader "Content-Security-Policy", headerValue
+        next()
 
 reload = (pattern) ->
     script = """
@@ -204,6 +240,14 @@ module.exports = class ExtPipe extends BasePipe
     @schema: ->
         description: "Webserver with optional Testem and Reload integration."
         properties:
+            hostnames:
+                description: """
+                    List of hostnames for webserver (default: [])
+                """
+                type: "array"
+                items:
+                    type: "string"
+                    uniqueItems: true
             key:
                 description: "Private key to use for SSL (default: \"\")"
                 type: "string"
@@ -216,6 +260,10 @@ module.exports = class ExtPipe extends BasePipe
             reload:
                 description: "Pages to inject reload code to (default: \"\")"
                 type: "string"
+            csp:
+                description: "Content security policy settings
+                    (default: \"{...}\")"
+                type: "object"
             middleware:
                 description: """
                     Middleware modules to add to the webserver (default: [])
@@ -227,17 +275,20 @@ module.exports = class ExtPipe extends BasePipe
                     uniqueItems: true
 
     @configDefaults:
+        hostnames: []
         port: 8613
         reload: null
         middleware: []
         key: ""
         cert: ""
+        csp: {}
 
     @stateDefaults:
         files: {}
 
     init: ->
         @app = express()
+        @app.use csp @config.csp, @config.hostnames, @config.reload
 
         if @config.key and @config.cert
             @server = https.createServer {
