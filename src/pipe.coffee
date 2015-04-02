@@ -286,6 +286,125 @@ class CompileInputDataPipe extends BasePipe
 
 
 
+class DependsPipe extends BasePipe
+    @stateDefaults:
+        depsFor: {}
+        depsOn: {}
+        files: {}
+        backlog: {}
+
+    _compile: (names) ->
+        depsOn = @state.depsOn
+        names.reduce (p, i) =>
+            if Object.keys(depsOn[i]).length
+                p
+            else
+                p
+                .then => @fileAdd i
+                .then => @compile i
+        , RSVP.Promise.resolve()
+
+    start: ->
+        @started = true
+        depsOn = @state.depsOn
+        names = []
+        for name of @state.backlog
+            delete @state.backlog[name]
+            names.push name if not Object.keys(depsOn[name]).length
+        @_compile names
+
+    add: (file) ->
+        file.add = true
+        @state.depsFor[file.name] = {}
+        @state.depsOn[file.name] = {}
+        @state.files[file.name] = new Buffer ""
+
+        depsOn = @state.depsOn[file.name]
+        for name, deps of @state.depsFor
+            depsOn[name] = true if deps[file.name]
+
+        if @started
+            if Object.keys(depsOn).length
+                file
+            else
+                @fileAdd file.name
+        else
+            @state.backlog[file.name] = true
+            file
+
+    change: (file) ->
+        @state.files[file.name] = file.content
+        deps = @dependenciesFor file.name
+        old = @state.depsFor[file.name]
+        @state.depsFor[file.name] = {}
+        for dep in deps
+            @state.depsFor[file.name][dep] = true
+        deps = @state.depsFor[file.name]
+
+        add = []
+        unlink = []
+        for dep of old
+            # obsolete dep
+            if not deps[dep]
+                c = @state.depsOn[dep]
+                if c
+                    delete c[file.name]
+                    add.push dep
+
+        for dep of deps
+            # new dep
+            if not old[dep]
+                c = @state.depsOn[dep]
+                if c
+                    c[file.name] = true
+                    unlink.push dep
+
+        promise = unlink.reduce (p, i) =>
+            p.then => @fileUnlink i
+        , RSVP.Promise.resolve()
+
+        if @started
+            promise = promise.then => @_compile add
+        else
+            for name in add
+                @state.backlog[name] = true
+
+        promise.then =>
+            if @started
+                depsOn = @state.depsOn[file.name]
+                if Object.keys(depsOn).length
+                    @_compile Object.keys depsOn
+                else
+                    @_compile [file.name]
+            else
+                @state.backlog[file.name] = true
+                file
+
+    unlink: (file) ->
+        deps = @state.depsFor[file.name]
+        delete @state.depsFor[file.name]
+        delete @state.depsOn[file.name]
+        delete @state.files[file.name]
+        delete @state.backlog[file.name]
+
+        add = []
+        for dep of deps
+            depsOn = @state.depsOn[dep]
+            delete depsOn[file.name]
+            add.push dep
+
+        if @started
+            @_compile add
+            .then =>
+                @fileUnlink file.name
+        else
+            for name in add
+                @state.backlog[name] = true
+            @fileUnlink file.name
+
+
+
 module.exports.BasePipe = BasePipe
 module.exports.CompileInputListPipe = CompileInputListPipe
 module.exports.CompileInputDataPipe = CompileInputDataPipe
+module.exports.DependsPipe = DependsPipe
