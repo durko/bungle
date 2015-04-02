@@ -27,6 +27,7 @@ module.exports = class ExtPipe extends CompileInputListPipe
         "routers"
         "routes"
         "serializers"
+        "services"
         "templates"
         "transforms"
         "views"
