@@ -67,17 +67,9 @@ module.exports = class ExtPipe extends CompileInputListPipe
             modname = "#{camelcasename}#{type}"
 
             results.push "import #{modname} from \"./#{pathname}\";"
-            if modname is "Router"
-                router = true
-                continue
-
             objects.push "#{modname}"
         results.push "var App = {"
         results.push "
-            init: function() {
-                this._super.apply(this, arguments);
-                this.Router = Router;
-            },
             Resolver: Em.DefaultResolver.extend({
                 resolveOther: function(parsedName) {
                     var factory = this._super(parsedName);
